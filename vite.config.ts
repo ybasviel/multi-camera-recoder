@@ -5,7 +5,7 @@ import type { PluginOption } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/multi-camera-recorder/',
+  base: '/',
   plugins: [svelte(), tailwindcss()],
   worker: {
     format: 'es',
