@@ -5,6 +5,7 @@ import type { PluginOption } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/multi-video-capture/',
   plugins: [svelte(), tailwindcss()],
   worker: {
     format: 'es',
