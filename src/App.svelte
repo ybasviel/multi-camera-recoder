@@ -14,6 +14,8 @@
     kind: string;
   }
   
+  type Preset = 'ultrafast' | 'superfast' | 'veryfast' | 'faster' | 'fast' | 'medium' | 'slow' | 'slower' | 'veryslow';
+  
   // 状態管理
   let videoDevices = $state<VideoDevice[]>([]);
   let selectedDevices = $state<Record<string, boolean>>({});
@@ -24,6 +26,7 @@
   let isConverting = $state(false);
   let conversionProgress = $state(0);
   let conversionStatus = $state('');
+  let encodingPreset = $state<Preset>('slow');
   
   // FFmpegインスタンス
   let ffmpeg = $state<FFmpeg | null>(null);
@@ -75,7 +78,8 @@
       cleanupComplete: 'Cleanup completed',
       errorOccurred: 'An error occurred: {error}',
       saveFailed: 'Failed to save recording: {error}',
-      saveFailedGeneric: 'Failed to save recording'
+      saveFailedGeneric: 'Failed to save recording',
+      encodingPreset: 'Encoding Preset',
     },
     ja: {
       title: 'マルチカメラレコーダー',
@@ -115,7 +119,8 @@
       cleanupComplete: 'クリーンアップが完了しました',
       errorOccurred: 'エラーが発生しました: {error}',
       saveFailed: '録画の保存に失敗しました: {error}',
-      saveFailedGeneric: '録画の保存に失敗しました'
+      saveFailedGeneric: '録画の保存に失敗しました',
+      encodingPreset: 'エンコーディングプリセット',
     }
   };
   
@@ -296,15 +301,19 @@
           await ffmpeg.exec([
             '-i', 'input.webm',
             '-c:v', 'libx264',
-            '-preset', 'ultrafast',
-            '-tune', 'zerolatency',
-            '-crf', '23',
+            '-preset', encodingPreset,
+            '-tune', 'film',
+            '-crf', '18',
             '-r', '60',
-            '-g', '30',
-            '-keyint_min', '30',
+            '-g', '60',
+            '-keyint_min', '60',
             '-sc_threshold', '0',
+            '-profile:v', 'high',
+            '-level', '4.1',
+            '-movflags', '+faststart',
             '-c:a', 'aac',
-            '-b:a', '128k',
+            '-b:a', '192k',
+            '-ar', '48000',
             'output.mp4'
           ]);
           addLog(t('ffmpegCommandComplete'));
@@ -379,8 +388,6 @@
       }
     }
   }
-  
-  // その他の関数は変更なし...
 </script>
 
 <div class="container mx-auto p-4">
@@ -400,6 +407,29 @@
         />
       </button>
       <span class="text-sm {currentLanguage === 'ja' ? 'text-gray-400' : 'text-gray-900'}">English</span>
+    </div>
+  </div>
+  
+  <!-- エンコーディング設定パネル -->
+  <div class="mb-6 bg-gray-100 p-4 rounded-lg">
+    <h2 class="text-xl font-semibold mb-2">{t('encodingPreset')}</h2>
+    <div class="space-y-4">
+      <div>
+        <select 
+          bind:value={encodingPreset}
+          class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 bg-white"
+        >
+          <option value="ultrafast">Ultrafast (最速)</option>
+          <option value="superfast">Superfast</option>
+          <option value="veryfast">Veryfast</option>
+          <option value="faster">Faster</option>
+          <option value="fast">Fast</option>
+          <option value="medium">Medium (標準)</option>
+          <option value="slow">Slow</option>
+          <option value="slower">Slower</option>
+          <option value="veryslow">Veryslow (最高品質)</option>
+        </select>
+      </div>
     </div>
   </div>
   
