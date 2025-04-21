@@ -1,11 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   
-  export let logs: string[] = [];
-  export let title: string = 'Processing Logs';
+  let { logs, title } = $props();
   
   // ログが追加されたときに自動スクロール
-  $: {
+  $effect(() => {
     if (logs.length > 0) {
       setTimeout(() => {
         const logContainer = document.querySelector('.log-container');
@@ -14,7 +13,7 @@
         }
       }, 0);
     }
-  }
+  });
 </script>
 
 <div class="mt-4 bg-gray-100 p-4 rounded-lg max-h-64 overflow-y-auto log-container">
