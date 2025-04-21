@@ -79,7 +79,9 @@
       errorOccurred: 'An error occurred: {error}',
       saveFailed: 'Failed to save recording: {error}',
       saveFailedGeneric: 'Failed to save recording',
-      encodingPreset: 'Encoding Preset',
+      encodingPreset: 'Encoding Preset (mp4)',
+      saveMp4: 'Save as MP4',
+      saveWebm: 'Save as WebM',
     },
     ja: {
       title: 'マルチカメラレコーダー',
@@ -120,7 +122,9 @@
       errorOccurred: 'エラーが発生しました: {error}',
       saveFailed: '録画の保存に失敗しました: {error}',
       saveFailedGeneric: '録画の保存に失敗しました',
-      encodingPreset: 'エンコーディングプリセット',
+      encodingPreset: 'エンコーディングプリセット (mp4用)',
+      saveMp4: 'MP4で保存',
+      saveWebm: 'WebMで保存',
     }
   };
   
@@ -259,7 +263,7 @@
   }
   
   // 録画の保存
-  async function saveRecordings() {
+  async function saveRecordings(format: 'mp4' | 'webm') {
     if (!ffmpegLoaded || !ffmpeg) {
       alert('FFmpeg is not loaded.');
       return;
@@ -267,112 +271,135 @@
     
     processingLogs = [];
     addLog(t('conversionStarted'));
-    addLog('start saving recordings...');
+    addLog(`start saving recordings as ${format}...`);
     
     for (const deviceId in recordedChunks) {
       if (recordedChunks[deviceId].length > 0) {
-        addLog(`processing recordings from device ${deviceId}...`);
-        addLog(`chunk count: ${recordedChunks[deviceId].length}`);
-        
         const blob = new Blob(recordedChunks[deviceId], { type: 'video/webm' });
-        addLog(`WebM file size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
-        
         const deviceName = videoDevices.find(d => d.deviceId === deviceId)?.label || deviceId;
         const safeDeviceName = deviceName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        const fileName = `recording_${safeDeviceName}_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
-        
+        const fileName = `recording_${safeDeviceName}_${new Date().toISOString().replace(/[:.]/g, '-')}.${format}`;
+
         try {
           isConverting = true;
           conversionProgress = 0;
           conversionStatus = 'converting...';
-          
-          addLog(t('inputFileLoading'));
-          const inputData = await fetchFile(blob);
-          addLog(t('inputFileLoaded'));
-          
-          await ffmpeg.writeFile('input.webm', inputData);
-          addLog(t('ffmpegWriteComplete'));
-          
-          ffmpeg.on('progress', ({ progress }) => {
-            addLog(t('conversionProgress', {progress: progress.toString()}));
-          });
-          
-          addLog(t('ffmpegCommandStart'));
-          await ffmpeg.exec([
-            '-i', 'input.webm',
-            '-c:v', 'libx264',
-            '-preset', encodingPreset,
-            '-tune', 'film',
-            '-crf', '18',
-            '-r', '60',
-            '-g', '60',
-            '-keyint_min', '60',
-            '-sc_threshold', '0',
-            '-profile:v', 'high',
-            '-level', '4.1',
-            '-movflags', '+faststart',
-            '-c:a', 'aac',
-            '-b:a', '192k',
-            '-ar', '48000',
-            'output.mp4'
-          ]);
-          addLog(t('ffmpegCommandComplete'));
-          addLog(t('outputFileDetails'));
-          addLog(t('videoCodec'));
-          addLog(t('audioCodec'));
-          addLog(t('frameRate'));
-          addLog(t('gopSize'));
-          addLog(t('quality'));
-          
-          addLog(t('outputFileLoading'));
-          const data = await ffmpeg.readFile('output.mp4');
-          addLog(t('outputFileSize', { size: ((data?.length || 0) / 1024 / 1024).toFixed(2) }));
-          
-          if (!data || data.length === 0) {
-            throw new Error(t('emptyFileError'));
-          }
-          
-          const videoBlob = new Blob([data], { type: 'video/mp4' });
-          addLog(t('mp4FileSize', { size: (videoBlob.size / 1024 / 1024).toFixed(2) }));
-          
-          if (videoBlob.size === 0) {
-            throw new Error(t('emptyFileError'));
-          }
-          
-          try {
-            addLog(t('saveDialog'));
-            const handle = await window.showSaveFilePicker({
-              suggestedName: fileName,
-              types: [{
-                description: 'MP4 Video',
-                accept: { 'video/mp4': ['.mp4'] }
-              }]
+
+          if (format === 'webm') {
+            // WebMの場合は直接保存
+            try {
+              const handle = await window.showSaveFilePicker({
+                suggestedName: fileName,
+                types: [{
+                  description: 'WebM Video',
+                  accept: { 'video/webm': ['.webm'] }
+                }]
+              });
+              
+              const writable = await handle.createWritable();
+              await writable.write(blob);
+              await writable.close();
+            } catch (error) {
+              // ファイルシステムAPIが使えない場合のフォールバック
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = fileName;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }
+          } else {
+            // MP4の場合は既存の変換処理を使用
+            addLog(t('inputFileLoading'));
+            const inputData = await fetchFile(blob);
+            addLog(t('inputFileLoaded'));
+            
+            await ffmpeg.writeFile('input.webm', inputData);
+            addLog(t('ffmpegWriteComplete'));
+            
+            ffmpeg.on('progress', ({ progress }) => {
+              addLog(t('conversionProgress', {progress: progress.toString()}));
             });
             
-            addLog(t('fileWritingStart'));
-            const writable = await handle.createWritable();
-            await writable.write(videoBlob);
-            await writable.close();
-            addLog(t('fileWritingComplete'));
+            addLog(t('ffmpegCommandStart'));
+            await ffmpeg.exec([
+              '-i', 'input.webm',
+              '-c:v', 'libx264',
+              '-preset', encodingPreset,
+              '-tune', 'film',
+              '-crf', '18',
+              '-r', '60',
+              '-g', '60',
+              '-keyint_min', '60',
+              '-sc_threshold', '0',
+              '-profile:v', 'high',
+              '-level', '4.1',
+              '-movflags', '+faststart',
+              '-c:a', 'aac',
+              '-b:a', '192k',
+              '-ar', '48000',
+              'output.mp4'
+            ]);
+            addLog(t('ffmpegCommandComplete'));
+            addLog(t('outputFileDetails'));
+            addLog(t('videoCodec'));
+            addLog(t('audioCodec'));
+            addLog(t('frameRate'));
+            addLog(t('gopSize'));
+            addLog(t('quality'));
             
-          } catch (error) {
-            addLog(t('fallbackDownload'));
-            const url = URL.createObjectURL(videoBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            addLog(t('downloadComplete'));
+            addLog(t('outputFileLoading'));
+            const data = await ffmpeg.readFile('output.mp4');
+            addLog(t('outputFileSize', { size: ((data?.length || 0) / 1024 / 1024).toFixed(2) }));
+            
+            if (!data || data.length === 0) {
+              throw new Error(t('emptyFileError'));
+            }
+            
+            const videoBlob = new Blob([data], { type: 'video/mp4' });
+            addLog(t('mp4FileSize', { size: (videoBlob.size / 1024 / 1024).toFixed(2) }));
+            
+            if (videoBlob.size === 0) {
+              throw new Error(t('emptyFileError'));
+            }
+            
+            try {
+              addLog(t('saveDialog'));
+              const handle = await window.showSaveFilePicker({
+                suggestedName: fileName,
+                types: [{
+                  description: 'MP4 Video',
+                  accept: { 'video/mp4': ['.mp4'] }
+                }]
+              });
+              
+              addLog(t('fileWritingStart'));
+              const writable = await handle.createWritable();
+              await writable.write(videoBlob);
+              await writable.close();
+              addLog(t('fileWritingComplete'));
+              
+            } catch (error) {
+              addLog(t('fallbackDownload'));
+              const url = URL.createObjectURL(videoBlob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = fileName;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              addLog(t('downloadComplete'));
+            }
+            
+            addLog(t('cleanupStart'));
+            await ffmpeg.deleteFile('input.webm');
+            await ffmpeg.deleteFile('output.mp4');
+            addLog(t('cleanupComplete'));
+            
           }
-          
-          addLog(t('cleanupStart'));
-          await ffmpeg.deleteFile('input.webm');
-          await ffmpeg.deleteFile('output.mp4');
-          addLog(t('cleanupComplete'));
-          
         } catch (error: unknown) {
           addLog(t('errorOccurred', { error: error instanceof Error ? error.message : 'Unknown error' }));
           if (error instanceof Error) {
@@ -506,11 +533,18 @@
       {t('stopRecording')}
     </button>
     <button 
-      onclick={saveRecordings}
+      onclick={() => saveRecordings('mp4')}
       disabled={Object.keys(recordedChunks).length === 0 || isConverting}
       class="px-4 py-2 bg-blue-600 text-white rounded-md disabled:bg-gray-400 disabled:cursor-not-allowed hover:bg-blue-700"
     >
-      {t('save')}
+      {t('saveMp4')}
+    </button>
+    <button 
+      onclick={() => saveRecordings('webm')}
+      disabled={Object.keys(recordedChunks).length === 0 || isConverting}
+      class="px-4 py-2 bg-green-600 text-white rounded-md disabled:bg-gray-400 disabled:cursor-not-allowed hover:bg-green-700"
+    >
+      {t('saveWebm')}
     </button>
   </div>
   
