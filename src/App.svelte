@@ -26,7 +26,7 @@
   let isConverting = $state(false);
   let conversionProgress = $state(0);
   let conversionStatus = $state('');
-  let encodingPreset = $state<Preset>('slow');
+  let encodingPreset = $state<Preset>('fast');
   
   // FFmpegインスタンス
   let ffmpeg = $state<FFmpeg | null>(null);
@@ -56,7 +56,7 @@
       inputFileLoading: 'Loading input file...',
       inputFileLoaded: 'Input file loaded',
       ffmpegWriteComplete: 'FFmpeg input file write completed',
-      conversionProgress: 'Conversion progress: {progress}%',
+      conversionProgress: 'Conversion progress: {progress}',
       ffmpegCommandStart: 'FFmpeg command execution started...',
       ffmpegCommandComplete: 'FFmpeg conversion completed successfully',
       outputFileDetails: 'Output file details:',
@@ -97,7 +97,7 @@
       inputFileLoading: '入力ファイルの読み込みを開始...',
       inputFileLoaded: '入力ファイルの読み込み完了',
       ffmpegWriteComplete: 'FFmpegへの入力ファイル書き込み完了',
-      conversionProgress: '変換進捗: {progress}%',
+      conversionProgress: '変換進捗: {progress}',
       ffmpegCommandStart: 'FFmpeg変換コマンドの実行を開始...',
       ffmpegCommandComplete: 'FFmpeg変換が正常に完了しました',
       outputFileDetails: '出力ファイルの詳細:',
@@ -261,21 +261,21 @@
   // 録画の保存
   async function saveRecordings() {
     if (!ffmpegLoaded || !ffmpeg) {
-      alert('FFmpegがロードされていません。');
+      alert('FFmpeg is not loaded.');
       return;
     }
     
     processingLogs = [];
     addLog(t('conversionStarted'));
-    addLog('録画の保存処理を開始します...');
+    addLog('start saving recordings...');
     
     for (const deviceId in recordedChunks) {
       if (recordedChunks[deviceId].length > 0) {
-        addLog(`デバイス ${deviceId} の録画データを処理中...`);
-        addLog(`チャンク数: ${recordedChunks[deviceId].length}`);
+        addLog(`processing recordings from device ${deviceId}...`);
+        addLog(`chunk count: ${recordedChunks[deviceId].length}`);
         
         const blob = new Blob(recordedChunks[deviceId], { type: 'video/webm' });
-        addLog(`WebMファイルサイズ: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+        addLog(`WebM file size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
         
         const deviceName = videoDevices.find(d => d.deviceId === deviceId)?.label || deviceId;
         const safeDeviceName = deviceName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
@@ -284,7 +284,7 @@
         try {
           isConverting = true;
           conversionProgress = 0;
-          conversionStatus = '変換処理を開始しています...';
+          conversionStatus = 'converting...';
           
           addLog(t('inputFileLoading'));
           const inputData = await fetchFile(blob);
@@ -294,7 +294,7 @@
           addLog(t('ffmpegWriteComplete'));
           
           ffmpeg.on('progress', ({ progress }) => {
-            addLog(t('conversionProgress', { progress: Math.round(progress * 100).toString() }));
+            addLog(t('conversionProgress', {progress: progress.toString()}));
           });
           
           addLog(t('ffmpegCommandStart'));
